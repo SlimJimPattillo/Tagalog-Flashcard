@@ -169,29 +169,6 @@ export function Decks() {
           )}
         </div>
 
-        {/* Import/Export Section */}
-        <div className="mt-6 p-4 bg-white rounded-lg shadow">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">
-            Import/Export
-          </h2>
-          <div className="space-y-2">
-            <button
-              onClick={() => navigate('/import')}
-              className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium rounded-lg"
-            >
-              Import CSV
-            </button>
-            <button
-              onClick={() => {
-                // TODO: Implement export
-                alert('Export feature coming soon!');
-              }}
-              className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium rounded-lg"
-            >
-              Export All Data (JSON)
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
