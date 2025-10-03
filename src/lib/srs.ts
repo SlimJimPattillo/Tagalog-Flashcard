@@ -1,4 +1,4 @@
-import { Rating, ReviewState } from '../db/schema';
+import type { Rating, ReviewState } from '../db/schema';
 
 export interface SM2Config {
   easeFactorStart: number;

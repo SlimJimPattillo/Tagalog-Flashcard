@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 export type PracticeDirection = 'tl_to_en' | 'en_to_tl' | 'mixed';

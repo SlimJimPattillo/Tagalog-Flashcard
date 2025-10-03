@@ -1,7 +1,7 @@
 import { ulid } from 'ulid';
 import { db } from '../db/schema';
 import type { Deck, Card } from '../db/schema';
-import { WORD_BANK, type WordBankEntry } from '../data/wordbank';
+import { WORD_BANK } from '../data/wordbank';
 import { initializeReviewState } from '../lib/srs';
 
 export async function createDeck(name: string): Promise<Deck> {
