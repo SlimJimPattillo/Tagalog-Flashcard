@@ -64,10 +64,21 @@ export async function generateAutoDeck(
   const shuffled = availableWords.sort(() => Math.random() - 0.5);
   const selectedWords = shuffled.slice(0, Math.min(50, shuffled.length));
 
-  // Create deck
-  const deckName = difficulty
+  // Create deck with counter for duplicates
+  const baseName = difficulty
     ? `Auto-Deck (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`
     : 'Auto-Deck (Mixed)';
+
+  // Check for existing decks with same base name and add counter
+  const existingDecks = await db.decks.toArray();
+  const sameNameDecks = existingDecks.filter(d =>
+    d.name.startsWith(baseName)
+  );
+
+  const deckName = sameNameDecks.length > 0
+    ? `${baseName} (${sameNameDecks.length + 1})`
+    : baseName;
+
   const deck = await createDeck(deckName);
 
   // Create cards
