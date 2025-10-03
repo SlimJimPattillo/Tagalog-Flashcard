@@ -2,6 +2,10 @@
 
 A mobile-first PWA for learning Tagalog vocabulary using spaced repetition (SM-2 algorithm).
 
+## 🚀 Live Demo
+
+**[Try it now!](https://slimjimpattillo.github.io/Tagalog-Flashcard/)** - No account needed, just visit and start learning!
+
 ## Features
 
 - ✅ **Spaced Repetition** - SM-2 algorithm for optimal memory retention
