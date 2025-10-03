@@ -6,13 +6,18 @@ import { ProgressHeader } from '../components/ProgressHeader';
 import { getDueCards, recordReview, type DueCard } from '../services/reviewService';
 import type { Rating } from '../db/schema';
 
+interface QueuedCard extends DueCard {
+  timesReviewed: number;
+}
+
 export function Review() {
   const navigate = useNavigate();
-  const [cards, setCards] = useState<DueCard[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [reviewQueue, setReviewQueue] = useState<QueuedCard[]>([]);
+  const [currentCard, setCurrentCard] = useState<QueuedCard | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [totalReviewed, setTotalReviewed] = useState(0);
   const [sessionStats, setSessionStats] = useState({
     again: 0,
     hard: 0,
@@ -27,7 +32,7 @@ export function Review() {
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyPress(e: KeyboardEvent) {
-      if (loading || cards.length === 0) return;
+      if (loading || !currentCard) return;
 
       if (!revealed && e.key === ' ') {
         e.preventDefault();
@@ -48,16 +53,23 @@ export function Review() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [revealed, loading, cards]);
+  }, [revealed, loading, currentCard]);
 
   async function loadCards() {
     try {
       const dueCards = await getDueCards();
-      setCards(dueCards);
       if (dueCards.length === 0) {
-        // No cards due, redirect to home
         setTimeout(() => navigate('/'), 1000);
+        return;
       }
+
+      const queuedCards: QueuedCard[] = dueCards.map(card => ({
+        ...card,
+        timesReviewed: 0,
+      }));
+
+      setReviewQueue(queuedCards);
+      setCurrentCard(queuedCards[0]);
     } catch (error) {
       console.error('Failed to load due cards:', error);
     } finally {
@@ -71,14 +83,52 @@ export function Review() {
     }
   }, [revealed]);
 
+  const requeueCard = (rating: Rating): number => {
+    // Determine requeue position based on rating with randomness
+    let maxPosition: number;
+
+    switch (rating) {
+      case 'again':
+        // Within next 4 cards (1-4)
+        maxPosition = Math.min(4, reviewQueue.length);
+        break;
+      case 'hard':
+        // Within next 7 cards (3-7)
+        maxPosition = Math.min(7, reviewQueue.length);
+        break;
+      case 'good':
+        // Within next 15 cards (8-15)
+        maxPosition = Math.min(15, reviewQueue.length);
+        break;
+      case 'easy':
+        // Within next 45 cards or end of queue (20-45)
+        maxPosition = Math.min(45, reviewQueue.length);
+        break;
+      default:
+        maxPosition = reviewQueue.length;
+    }
+
+    // Add randomness - pick a random position within the range
+    const minPosition = rating === 'again' ? 1 :
+                       rating === 'hard' ? 3 :
+                       rating === 'good' ? 8 :
+                       20;
+
+    const actualMin = Math.min(minPosition, maxPosition);
+    const position = Math.floor(Math.random() * (maxPosition - actualMin + 1)) + actualMin;
+
+    return Math.min(position, reviewQueue.length);
+  };
+
   const handleGrade = useCallback(
     async (rating: Rating) => {
-      if (!revealed || cards.length === 0) return;
+      if (!revealed || !currentCard) return;
 
-      const currentCard = cards[currentIndex];
       const duration = Date.now() - startTime;
+      const updatedCard = { ...currentCard, timesReviewed: currentCard.timesReviewed + 1 };
 
       try {
+        // Record the review in DB
         await recordReview(currentCard.id, rating, duration);
 
         // Update session stats
@@ -87,22 +137,46 @@ export function Review() {
           [rating]: prev[rating] + 1,
         }));
 
-        // Move to next card
-        if (currentIndex < cards.length - 1) {
-          setCurrentIndex(currentIndex + 1);
-          setRevealed(false);
-          setStartTime(Date.now());
+        setTotalReviewed(prev => prev + 1);
+
+        // Remove current card from queue
+        const remainingQueue = reviewQueue.slice(1);
+
+        // Determine if card should be requeued
+        const shouldRequeue = rating === 'again' || rating === 'hard' ||
+                             (rating === 'good' && updatedCard.timesReviewed < 2);
+
+        if (shouldRequeue && remainingQueue.length > 0) {
+          // Requeue the card
+          const position = requeueCard(rating);
+          const newQueue = [
+            ...remainingQueue.slice(0, position),
+            updatedCard,
+            ...remainingQueue.slice(position),
+          ];
+
+          setReviewQueue(newQueue);
+          setCurrentCard(newQueue[0]);
+        } else if (remainingQueue.length > 0) {
+          // Move to next card without requeuing
+          setReviewQueue(remainingQueue);
+          setCurrentCard(remainingQueue[0]);
         } else {
-          // Session complete
+          // Session complete - no more cards
           navigate('/results', {
-            state: { stats: sessionStats, cardsReviewed: cards.length },
+            state: { stats: sessionStats, cardsReviewed: totalReviewed },
           });
+          return;
         }
+
+        // Reset for next card
+        setRevealed(false);
+        setStartTime(Date.now());
       } catch (error) {
         console.error('Failed to record review:', error);
       }
     },
-    [revealed, cards, currentIndex, startTime, sessionStats, navigate]
+    [revealed, currentCard, reviewQueue, startTime, sessionStats, totalReviewed, navigate]
   );
 
   if (loading) {
@@ -113,7 +187,7 @@ export function Review() {
     );
   }
 
-  if (cards.length === 0) {
+  if (!currentCard) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="text-center">
@@ -132,15 +206,13 @@ export function Review() {
     );
   }
 
-  const currentCard = cards[currentIndex];
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Progress Header */}
       <ProgressHeader
-        current={currentIndex + 1}
-        total={cards.length}
-        dueCount={cards.length - currentIndex}
+        current={totalReviewed + 1}
+        total={totalReviewed + reviewQueue.length}
+        dueCount={reviewQueue.length}
       />
 
       {/* Main Content */}
