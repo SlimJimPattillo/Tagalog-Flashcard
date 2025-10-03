@@ -66,17 +66,17 @@ export async function generateAutoDeck(
 
   // Create deck with counter for duplicates
   const baseName = difficulty
-    ? `Auto-Deck (${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)})`
-    : 'Auto-Deck (Mixed)';
+    ? difficulty.charAt(0).toUpperCase() + difficulty.slice(1)
+    : 'Mixed';
 
   // Check for existing decks with same base name and add counter
   const existingDecks = await db.decks.toArray();
   const sameNameDecks = existingDecks.filter(d =>
-    d.name.startsWith(baseName)
+    d.name === baseName || d.name.startsWith(`${baseName} `)
   );
 
   const deckName = sameNameDecks.length > 0
-    ? `${baseName} (${sameNameDecks.length + 1})`
+    ? `${baseName} ${sameNameDecks.length + 1}`
     : baseName;
 
   const deck = await createDeck(deckName);
